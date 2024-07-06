@@ -38,7 +38,7 @@ class WordleBot():
         - 2 means the letter is in the solution and in the right position
         '''
         if len(guess) != len(solution):
-            print(len(guess), len(solution))
+            print(f"Error: Guess length of {len(guess)} does not match solution length of {len(solution)}.")
             return -1
 
         result = [0] * len(guess)
@@ -83,6 +83,20 @@ class WordleBot():
                     break
                 # if get to end, add in: no way! identical dist
         return best_guess
+    
+    def best_guess_info_theory(self, guess_response_distributions : Dict[str, Counter]):
+        '''
+        E[score] = 1*p(word=solution) + (1 - p(w=s))(1 + f(total_info_left - info_gained)) 
+        '''
+        best_guess = ''
+        max_expected_info = 0
+        for guess in guess_response_distributions:
+            p_x = [guess_response_distributions[guess][response]/sum(guess_response_distributions[guess].values()) for response in guess_response_distributions[guess]]
+            info_gain = -sum([p_x[i] * np.log2(p_x[i]) for i in range(len(p_x))])
+            if info_gain > max_expected_info:
+                max_expected_info = info_gain
+                best_guess = guess
+        return best_guess
 
     def find_response_buckets(self, best_guess : str, valid_solutions : list) -> Dict[str, list]:
         response_buckets = {}
@@ -110,7 +124,7 @@ class WordleBot():
             best_guess_node = self.solved_paths.search(path)
             if best_guess_node is None:
                 guess_response_distributions : Dict[str, Counter] = self.guess_response_distributions(solutions)
-                best_guess : str = self.best_guess(guess_response_distributions)
+                best_guess : str = self.best_guess_info_theory(guess_response_distributions)
                 self.solved_paths.insert(best_guess, path)
             else:
                 best_guess = best_guess_node.value
@@ -140,7 +154,7 @@ class WordleBot():
         
 
     def save_solved_paths(self):
-        with open('solved_paths.txt', 'w') as f:
+        with open('solved_paths_info_theory.txt', 'w') as f:
             f.write(str(self.solved_paths))
             
 
