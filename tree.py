@@ -22,6 +22,24 @@ class Node():
                 string += f"'{k}': {v}, "
             return f"{string[:-2]}}})"
         return "-1"
+    
+    def to_json(self):
+        if not self.children:
+            return f'{{"value": "{self.value}"}}'
+        
+        string = f'{{"value": "{self.value}", "children": {{'
+        if len(self.children) < 1:
+            return f'{string}}}}}'
+        
+        if len(self.children) == 1:
+            k, v = list(self.children.items())[0]
+            return f'{string}"{k}": {v.to_json()}}}}}'
+        
+        if len(self.children) > 1:
+            for k, v in self.children.items():
+                string += f'"{k}": {v.to_json()}, '
+            return f'{string[:-2]}}}}}'
+        return '-1'
 
 class Tree():
     def __init__(self, root : Node = None):
@@ -29,6 +47,9 @@ class Tree():
 
     def __str__(self):
         return f"Tree({self.root})"
+    
+    def to_json(self):
+        return self.root.to_json()
     
     def is_empty(self):
         return self.root is None
@@ -84,7 +105,8 @@ if __name__ == '__main__':
     print("Insert 'A' into an empty tree:", tree2.insert('A', []))
     print(tree2)
     print("Insert 'B' into an empty tree:", tree2.insert('B', ['0']))
-    print(tree2)
+    print("To jSON:")
+    print(tree.to_json())
 
 
 

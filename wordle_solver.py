@@ -1,31 +1,20 @@
-import matplotlib.pyplot as plt
 import numpy as np
-import os
-import pandas as pd
-import seaborn as sns
 import time
 
 from collections import Counter
 from datetime import timedelta
-from functools import cache
 from typing import Dict
 
 from tree import Tree
 
+APPROACHES = ['sl_buckets', 'info_theory']
 MAX_INT = 1000000000
 
 class WordleBot():
-    def __init__(self):
-        self.guesses : list[str] = open('candidate_guesses.csv', 'r').read().split('\n')
-        if self.guesses[0] == 'word':
-            self.guesses = self.guesses[1:]
-        if self.guesses[-1] == '':
-            self.guesses = self.guesses[:-1]
-        self.solutions : list[str] = open('valid_solutions.csv', 'r').read().split('\n')
-        if self.solutions[0] == 'word':
-            self.solutions = self.solutions[1:]
-        if self.solutions[-1] == '':
-            self.solutions = self.solutions[:-1]
+    def __init__(self, approach : str = 'info_theory'):
+        self.approach = approach
+        self.guesses : list[str] = open('data/candidate_guesses.csv', 'r').read().split('\n')
+        self.solutions : list[str] = open('data/valid_solutions.csv', 'r').read().split('\n')
         self.solved_paths : Tree = Tree()
                                                            
     def wordle_response(self, guess : str, solution : str) -> str:
@@ -54,6 +43,11 @@ class WordleBot():
         return "".join(map(str, result))
     
     def guess_response_distributions(self, valid_solutions : list[str]) -> Dict[str, Counter]:
+        '''
+        Count the size of the buckets for each guess.
+        valid_solutions: a list of valid solutions
+        return: a dictionary of guesses and their corresponding response distributions
+        '''
         guess_response_distributions = {}
         for guess in self.guesses:
             print(f"\t\t\tCounting size of buckets: {guess[0]}/z", end='\r')
@@ -64,7 +58,12 @@ class WordleBot():
             guess_response_distributions[guess] = bucket_distribution
         return guess_response_distributions
 
-    def best_guess(self, guess_response_distributions : Dict[str, Counter]):
+    def best_guess_sl_buckets(self, guess_response_distributions : Dict[str, Counter]):
+        '''
+        Smallest largest buckets, or sl_buckets.
+        guess_response_distributions: a dictionary of guesses and their corresponding response distributions
+        return: the guess with the smallest largest buckets
+        '''
         best_distribution : list[tuple[str, int]] = [('_____', MAX_INT)]
         best_guess = ''
         for guess in guess_response_distributions:
@@ -86,7 +85,9 @@ class WordleBot():
     
     def best_guess_info_theory(self, guess_response_distributions : Dict[str, Counter]):
         '''
-        E[score] = 1*p(word=solution) + (1 - p(w=s))(1 + f(total_info_left - info_gained)) 
+        Information theory approach to finding the best guess: -Σp(x)lg(p(x))
+        guess_response_distributions: a dictionary of guesses and their corresponding response distributions
+        return: the guess with the highest expected information gain
         '''
         best_guess = ''
         max_expected_info = 0
@@ -99,6 +100,12 @@ class WordleBot():
         return best_guess
 
     def find_response_buckets(self, best_guess : str, valid_solutions : list) -> Dict[str, list]:
+        '''
+        Given a guess, find the solution words that fall into each response.
+        best_guess: a string of 5 letters
+        valid_solutions: a list of valid solutions
+        return: a dictionary of responses and their corresponding potential solutions
+        '''
         response_buckets = {}
         for solution in valid_solutions:
             response = self.wordle_response(best_guess, solution)
@@ -107,15 +114,13 @@ class WordleBot():
             response_buckets[response].append(solution)
         return response_buckets
 
-
-    # Total flow:
-    # Using the base best candidate 'raise', characterized by a tied smallest largest bucket and the smallest second largest bucket, as our root
-    # Wait for a response from the user, and enter the response bucket corresponding to the wordle_feedback
-    # With a restricted set of valid solutions, determine a new best candidate and repeat.
-
-    # Note: when len(valid_solutions) == 1: it immediately becomes the best candidate.
-    #  when 1 is the size of the largest bucket, if there exists a bucket with 22222, add it to the best candidates, then return one
-    def find_path(self, solution):
+    def find_path(self, solution, scoring_function):
+        '''
+        Find the path to the solution using the scoring function.
+        solution: a string of 5 letters
+        scoring_function: a function that takes in a dictionary of guesses and their corresponding response distributions and returns the best guess
+        return: a list of guesses and their corresponding responses
+        '''
         guess_info = []
         solutions : list[str] = self.solutions
         path = []
@@ -124,7 +129,7 @@ class WordleBot():
             best_guess_node = self.solved_paths.search(path)
             if best_guess_node is None:
                 guess_response_distributions : Dict[str, Counter] = self.guess_response_distributions(solutions)
-                best_guess : str = self.best_guess_info_theory(guess_response_distributions)
+                best_guess : str = scoring_function(guess_response_distributions)
                 self.solved_paths.insert(best_guess, path)
             else:
                 best_guess = best_guess_node.value
@@ -139,12 +144,15 @@ class WordleBot():
         return guess_info
     
     def solve_wordle(self):
+        '''
+        Solve the wordle game for all solutions.
+        '''
         solve_times = []
-        
+        scoring_function = getattr(self, f"best_guess_{self.approach}")
         for i, solution in enumerate(self.solutions):
             print(f"{i}/{len(self.solutions)} solutions", end='\r')
             start = time.time()
-            guess_info = self.find_path(solution)
+            guess_info = self.find_path(solution, scoring_function)
             end = time.time()
             print(f"Solved {solution} in {len(guess_info)} guesses: {guess_info}")
             print(f"Solved {solution} in {timedelta(seconds=end-start)} seconds.")
@@ -154,12 +162,15 @@ class WordleBot():
         
 
     def save_solved_paths(self):
-        with open('solved_paths_info_theory.txt', 'w') as f:
-            f.write(str(self.solved_paths))
+        '''
+        Save the solved paths to a text file.
+        '''
+        with open(f'results/{self.approach}.json', 'w') as f:
+            f.write(self.solved_paths.to_json())
             
-
 if __name__ == '__main__':
-    bot = WordleBot()
+    approach = 'info_theory'
+    bot = WordleBot(approach)
     bot.solve_wordle()
     bot.save_solved_paths()
 
