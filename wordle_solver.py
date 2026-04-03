@@ -13,8 +13,8 @@ MAX_INT = 1000000000
 class WordleBot():
     def __init__(self, approach : str = 'info_theory'):
         self.approach = approach
-        self.guesses : list[str] = open('data/candidate_guesses.csv', 'r').read().split('\n')
-        self.solutions : list[str] = open('data/valid_solutions.csv', 'r').read().split('\n')
+        self.guesses : list[str] = open('data/candidate_guesses.txt', 'r').read().split('\n')
+        self.solutions : list[str] = open('data/valid_solutions.txt', 'r').read().split('\n')
         self.solved_paths : Tree = Tree()
                                                            
     def wordle_response(self, guess : str, solution : str) -> str:
